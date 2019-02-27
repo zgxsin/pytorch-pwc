@@ -9,36 +9,57 @@ import os
 import PIL
 import PIL.Image
 import sys
-
+import argparse
+from os.path import isfile, join
 try:
 	from correlation import correlation # the custom cost volume layer
 except:
 	sys.path.insert(0, './correlation'); import correlation # you should consider upgrading python
 # end
 
+
+
+
+
+
+
+
+
+##########################################################
+parser = argparse.ArgumentParser(description="This is the script for predicting the optical flow of a whole dataset")
+
+parser.add_argument("--model", metavar="MODEL", required=True, type=str, default="default",
+					help="choose a model to run the prediction")
+parser.add_argument("--dataset", metavar="DATASET", required=True, help="choose a dataset to run the prediction")
+parser.add_argument("--numGPUs", type=int, default=1, help= "Set the number of GPUs to use")
+parser.add_argument("--outdir", metavar="OUTPUTDIR", required=True, help="choose a dataset to save the flow")
+
+args = parser.parse_args()
 ##########################################################
 
 assert(int(str('').join(torch.__version__.split('.')[0:3])) >= 41) # requires at least pytorch version 0.4.1
 
 torch.set_grad_enabled(False) # make sure to not compute gradients for computational performance
 
-torch.cuda.device(1) # change this if you have a multiple graphics cards and you want to utilize them
+torch.cuda.device(args.numGPUs) # change this if you have a multiple graphics cards and you want to utilize them
 
 torch.backends.cudnn.enabled = True # make sure to use cudnn for computational performance
 
 ##########################################################
 
-arguments_strModel = 'default'
-arguments_strFirst = './images/first.png'
-arguments_strSecond = './images/second.png'
-arguments_strOut = './out.flo'
+# arguments_strModel = 'default'
+# arguments_strFirst = './images/first.png'
+# arguments_strSecond = './images/second.png'
+# arguments_strOut = './out.flo'
+#
+# for strOption, strArgument in getopt.getopt(sys.argv[1:], '', [ strParameter[2:] + '=' for strParameter in sys.argv[1::2] ])[0]:
+# 	if strOption == '--model' and strArgument != '': arguments_strModel = strArgument # which model to use
+# 	if strOption == '--first' and strArgument != '': arguments_strFirst = strArgument # path to the first frame
+# 	if strOption == '--second' and strArgument != '': arguments_strSecond = strArgument # path to the second frame
+# 	if strOption == '--out' and strArgument != '': arguments_strOut = strArgument # path to where the output should be stored
+# # end
 
-for strOption, strArgument in getopt.getopt(sys.argv[1:], '', [ strParameter[2:] + '=' for strParameter in sys.argv[1::2] ])[0]:
-	if strOption == '--model' and strArgument != '': arguments_strModel = strArgument # which model to use
-	if strOption == '--first' and strArgument != '': arguments_strFirst = strArgument # path to the first frame
-	if strOption == '--second' and strArgument != '': arguments_strSecond = strArgument # path to the second frame
-	if strOption == '--out' and strArgument != '': arguments_strOut = strArgument # path to where the output should be stored
-# end
+
 
 ##########################################################
 
@@ -258,7 +279,7 @@ class Network(torch.nn.Module):
 
 		self.moduleRefiner = Refiner()
 
-		self.load_state_dict(torch.load('./network-' + arguments_strModel + '.pytorch'))
+		self.load_state_dict(torch.load('./network-' + args.model + '.pytorch'))
 	# end
 
 	def forward(self, tensorFirst, tensorSecond):
@@ -310,16 +331,24 @@ def estimate(tensorFirst, tensorSecond):
 ##########################################################
 
 if __name__ == '__main__':
-	tensorFirst = torch.FloatTensor(numpy.array(PIL.Image.open(arguments_strFirst))[:, :, ::-1].transpose(2, 0, 1).astype(numpy.float32) * (1.0 / 255.0))
-	tensorSecond = torch.FloatTensor(numpy.array(PIL.Image.open(arguments_strSecond))[:, :, ::-1].transpose(2, 0, 1).astype(numpy.float32) * (1.0 / 255.0))
 
-	tensorOutput = estimate(tensorFirst, tensorSecond)
+	i = 0
+	while 1:
+		image_first = args.dataset + '/' + format(i, '06d') + '.png'
+		image_second = args.dataset + '/' + format(i+1, '06d') + '.png'
+		if not isfile(image_second):
+			break
+		tensorFirst = torch.FloatTensor(numpy.array(PIL.Image.open(image_first))[:, :, ::-1].transpose(2, 0, 1).astype(numpy.float32) * (1.0 / 255.0))
+		tensorSecond = torch.FloatTensor(numpy.array(PIL.Image.open(image_second))[:, :, ::-1].transpose(2, 0, 1).astype(numpy.float32) * (1.0 / 255.0))
 
-	objectOutput = open(arguments_strOut, 'wb')
+		tensorOutput = estimate(tensorFirst, tensorSecond)
 
-	# numpy.array([ 80, 73, 69, 72 ], numpy.uint8).tofile(objectOutput)
-	# numpy.array([ tensorOutput.size(2), tensorOutput.size(1) ], numpy.int32).tofile(objectOutput)
-	numpy.array(tensorOutput.numpy().transpose(1, 2, 0), numpy.float32).tofile(objectOutput)
+		objectOutput = open(args.outdir + "/flow_" + format(i, '06d') + '.flo', 'wb')
 
-	objectOutput.close()
+		# numpy.array([ 80, 73, 69, 72 ], numpy.uint8).tofile(objectOutput)
+		# numpy.array([ tensorOutput.size(2), tensorOutput.size(1) ], numpy.int32).tofile(objectOutput)
+		numpy.array(tensorOutput.numpy().transpose(1, 2, 0), numpy.float32).tofile(objectOutput)
+
+		objectOutput.close()
+		i = i+1
 # end
