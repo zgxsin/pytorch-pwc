@@ -286,8 +286,8 @@ def estimate(tensorFirst, tensorSecond):
 	intWidth = tensorFirst.size(2)
 	intHeight = tensorFirst.size(1)
 
-	assert(intWidth == 1024) # remember that there is no guarantee for correctness, comment this line out if you acknowledge this and want to continue
-	assert(intHeight == 436) # remember that there is no guarantee for correctness, comment this line out if you acknowledge this and want to continue
+	# assert(intWidth == 1024) # remember that there is no guarantee for correctness, comment this line out if you acknowledge this and want to continue
+	# assert(intHeight == 436) # remember that there is no guarantee for correctness, comment this line out if you acknowledge this and want to continue
 
 	tensorPreprocessedFirst = tensorFirst.cuda().view(1, 3, intHeight, intWidth)
 	tensorPreprocessedSecond = tensorSecond.cuda().view(1, 3, intHeight, intWidth)
@@ -299,6 +299,7 @@ def estimate(tensorFirst, tensorSecond):
 	tensorPreprocessedSecond = torch.nn.functional.interpolate(input=tensorPreprocessedSecond, size=(intPreprocessedHeight, intPreprocessedWidth), mode='bilinear', align_corners=False)
 
 	tensorFlow = 20.0 * torch.nn.functional.interpolate(input=moduleNetwork(tensorPreprocessedFirst, tensorPreprocessedSecond), size=(intHeight, intWidth), mode='bilinear', align_corners=False)
+	# we already multiple 20 by our returned result here
 
 	tensorFlow[:, 0, :, :] *= float(intWidth) / float(intPreprocessedWidth)
 	tensorFlow[:, 1, :, :] *= float(intHeight) / float(intPreprocessedHeight)
@@ -316,8 +317,8 @@ if __name__ == '__main__':
 
 	objectOutput = open(arguments_strOut, 'wb')
 
-	numpy.array([ 80, 73, 69, 72 ], numpy.uint8).tofile(objectOutput)
-	numpy.array([ tensorOutput.size(2), tensorOutput.size(1) ], numpy.int32).tofile(objectOutput)
+	# numpy.array([ 80, 73, 69, 72 ], numpy.uint8).tofile(objectOutput)
+	# numpy.array([ tensorOutput.size(2), tensorOutput.size(1) ], numpy.int32).tofile(objectOutput)
 	numpy.array(tensorOutput.numpy().transpose(1, 2, 0), numpy.float32).tofile(objectOutput)
 
 	objectOutput.close()
